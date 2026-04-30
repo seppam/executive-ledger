@@ -1,0 +1,23 @@
+// This is your Prisma schema file — Prisma 7 format.
+// Connection URL is managed in prisma.config.ts, not here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Expenses table (matches PRD schema) ────────────────────────────────────────
+model Expense {
+  id          String   @id @default(uuid())
+  amount      Float
+  category    String
+  description String
+  date        String   // ISO date string: "YYYY-MM-DD"
+  created_at  DateTime @default(now())
+
+  @@map("expenses")
+}
