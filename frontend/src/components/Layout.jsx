@@ -4,28 +4,35 @@ import Sidebar from './Sidebar';
 import AddExpenseModal from './AddExpenseModal';
 
 export default function Layout() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen]       = useState(false);
+  const [editTarget, setEditTarget]         = useState(null);
+  const [refreshSeed, setRefreshSeed]       = useState(0);
 
-  // This can be used by child pages to trigger a specific refresh logic
-  // if they need to update after a successful add.
-  const [refreshSeed, setRefreshSeed] = useState(0);
+  const openModal = () => {
+    setEditTarget(null);
+    setIsModalOpen(true);
+  };
 
-  const openModal = () => setIsModalOpen(true);
-  const triggerRefresh = () => setRefreshSeed(prev => prev + 1);
+  const openEditModal = (expense) => {
+    setEditTarget(expense);
+    setIsModalOpen(true);
+  };
+
+  const triggerRefresh = () => setRefreshSeed((s) => s + 1);
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar openModal={openModal} />
-      
-      {/* Main canvas offset by sidebar width */}
+
       <main className="ml-64 flex-1 min-h-screen">
-        <Outlet context={{ openModal, triggerRefresh, refreshSeed }} />
+        <Outlet context={{ openModal, openEditModal, triggerRefresh, refreshSeed }} />
       </main>
 
-      <AddExpenseModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <AddExpenseModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditTarget(null); }}
         onSuccess={triggerRefresh}
+        editExpense={editTarget}
       />
     </div>
   );

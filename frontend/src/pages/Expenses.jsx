@@ -21,11 +21,11 @@ const categoryColors = {
 };
 
 export default function Expenses() {
-  const { openModal, triggerRefresh } = useOutletContext();
-  const [expenses, setExpenses]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [filter, setFilter]          = useState('');
-  const [deletingId, setDeletingId]  = useState(null);
+  const { openModal, openEditModal, triggerRefresh, refreshSeed } = useOutletContext();
+  const [expenses, setExpenses]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [filter, setFilter]      = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -36,10 +36,9 @@ export default function Expenses() {
 
   useEffect(() => { load(); }, []);
 
-  // Reload when modal added new expense
   useEffect(() => {
-    if (triggerRefresh > 0) load();
-  }, [triggerRefresh]);
+    if (refreshSeed > 0) load();
+  }, [refreshSeed]);
 
   async function handleDelete(id) {
     if (!confirm('Delete this transaction?')) return;
@@ -69,7 +68,9 @@ export default function Expenses() {
           <p className="text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
             Financial Ledger
           </p>
-          <h1 className="text-3xl font-manrope font-extrabold text-on-surface tracking-tight">Transactions</h1>
+          <h1 className="text-3xl font-manrope font-extrabold text-on-surface tracking-tight">
+            Transactions
+          </h1>
         </div>
         <button
           onClick={openModal}
@@ -128,7 +129,9 @@ export default function Expenses() {
                 {['Date','Description','Category','Amount',''].map((col) => (
                   <th
                     key={col}
-                    className={`px-6 py-5 text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 ${col === 'Amount' ? 'text-right' : ''} ${col === '' ? 'w-16' : ''}`}
+                    className={`px-6 py-5 text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 ${
+                      col === 'Amount' ? 'text-right' : ''
+                    } ${col === '' ? 'w-24' : ''}`}
                   >
                     {col}
                   </th>
@@ -137,28 +140,46 @@ export default function Expenses() {
             </thead>
             <tbody className="divide-y divide-surface-container/40">
               {filtered.map((tx) => (
-                <tr key={tx.id} className="hover:bg-surface-container-low/40 transition-colors">
-                  <td className="px-6 py-5 text-sm text-slate-500 font-inter whitespace-nowrap">{tx.date}</td>
+                <tr
+                  key={tx.id}
+                  className="hover:bg-surface-container-low/40 transition-colors group"
+                >
+                  <td className="px-6 py-5 text-sm text-slate-500 font-inter whitespace-nowrap">
+                    {tx.date}
+                  </td>
                   <td className="px-6 py-5">
                     <span className="font-manrope font-bold text-on-surface">{tx.description}</span>
                   </td>
                   <td className="px-6 py-5">
-                    <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${categoryColors[tx.category] || categoryColors['Others']}`}>
+                    <span
+                      className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                        categoryColors[tx.category] || categoryColors['Others']
+                      }`}
+                    >
                       {tx.category}
                     </span>
                   </td>
                   <td className="px-6 py-5 text-right">
                     <span className="font-manrope font-bold text-on-surface">{formatAmt(tx.amount)}</span>
                   </td>
-                  <td className="px-6 py-5 text-right">
-                    <button
-                      onClick={() => handleDelete(tx.id)}
-                      disabled={deletingId === tx.id}
-                      className="p-2 rounded-xl hover:bg-error-container text-slate-400 hover:text-error transition-all disabled:opacity-40"
-                      title="Delete transaction"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
-                    </button>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEditModal(tx)}
+                        className="p-2 rounded-xl hover:bg-surface-container text-slate-400 hover:text-primary transition-all"
+                        title="Edit transaction"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(tx.id)}
+                        disabled={deletingId === tx.id}
+                        className="p-2 rounded-xl hover:bg-error-container text-slate-400 hover:text-error transition-all disabled:opacity-40"
+                        title="Delete transaction"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
