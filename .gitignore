@@ -34,3 +34,8 @@ backend/prisma/migrations/*.sql
 
 # Misc
 *.local
+
+# SQLite temp
+*.db-journal
+*.db-shm
+*.db-wal

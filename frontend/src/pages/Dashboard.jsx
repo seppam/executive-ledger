@@ -4,49 +4,56 @@ import BalanceCard from '../components/BalanceCard';
 import AIInsightCard from '../components/AIInsightCard';
 import TransactionRow from '../components/TransactionRow';
 import { getSpendingInsights } from '../services/geminiService';
-import { getExpenses, getStats } from '../services/expenseService';
+import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../services/apiClient';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function Dashboard() {
-  // refreshSeed signal — incremented by Layout after modal saves
   const { refreshSeed } = useOutletContext();
+  const { getHeaders }  = useAuth();
 
   const [transactions, setTransactions] = useState([]);
-  const [stats, setStats]                 = useState(null);
-  const [insight, setInsight]             = useState(null);
-  const [loading, setLoading]             = useState(false);
-  const [fetching, setFetching]           = useState(true);
-  const [error, setError]                 = useState(null);
+  const [stats, setStats]               = useState(null);
+  const [budgetProgress, setBudgetProgress] = useState(null);
+  const [budgetAlerts, setBudgetAlerts]  = useState([]);
+  const [insight, setInsight]           = useState(null);
+  const [loading, setLoading]           = useState(false);
+  const [fetching, setFetching]          = useState(true);
+  const [error, setError]                = useState(null);
 
   const loadData = useCallback(async () => {
     setFetching(true);
     setError(null);
     try {
-      const [expensesData, statsData] = await Promise.all([getExpenses(), getStats()]);
+      const [expensesData, statsData, budgetData] = await Promise.all([
+        apiFetch('/api/expenses?take=20', getHeaders),
+        apiFetch('/api/expenses/stats', getHeaders),
+        apiFetch('/api/budgets/progress', getHeaders),
+      ]);
       setTransactions(expensesData);
       setStats(statsData);
+      setBudgetProgress(budgetData.budgets || []);
+      setBudgetAlerts(budgetData.alerts  || []);
     } catch (err) {
-      setError(`Failed to load data: ${err.message}`);
-      console.error(err);
+      setError(`Failed to load: ${err.message}`);
     } finally {
       setFetching(false);
     }
   }, []);
 
-  // Reload whenever a new expense is added via modal
-  useEffect(() => { loadData(); }, [refreshSeed, loadData]);
-
-  // Initial load
+  useEffect(() => { loadData(); }, [refreshSeed]);
   useEffect(() => { loadData(); }, []);
 
   function calcChange(stats) {
-    const curMonth  = new Date().getMonth() + 1;
-    const prevMonth = curMonth === 1 ? 12 : curMonth - 1;
-    const cur  = stats.byMonth[curMonth]  || 0;
-    const prev = stats.byMonth[prevMonth] || 0;
-    if (prev === 0) return null;
-    return ((cur - prev) / prev * 100).toFixed(1);
+    const cur  = new Date().getMonth() + 1;
+    const prev = cur === 1 ? 12 : cur - 1;
+    const c = stats.byMonth[cur]  || { income: 0, expense: 0 };
+    const p = stats.byMonth[prev] || { income: 0, expense: 0 };
+    const curExp  = c.expense  || 0;
+    const prevExp = p.expense  || 0;
+    if (prevExp === 0) return null;
+    return ((curExp - prevExp) / prevExp * 100).toFixed(1);
   }
 
   async function handleGenerateInsight() {
@@ -54,7 +61,7 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const result = await getSpendingInsights(transactions);
+      const result = await getSpendingInsights(transactions, getHeaders);
       setInsight(result);
     } catch (err) {
       setError(err.code === 'NO_API_KEY' ? err.message : `Insight failed: ${err.message}`);
@@ -63,13 +70,13 @@ export default function Dashboard() {
     }
   }
 
-  const change   = stats ? calcChange(stats) : null;
+  const change    = stats ? calcChange(stats) : null;
   const recent   = transactions.slice(0, 6);
+  const hasAlert = budgetAlerts.length > 0;
   const fmtTotal = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
   return (
     <>
-      {/* Top nav bar */}
       <header className="flex justify-between items-center w-full px-8 py-5 sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-surface-container">
         <div className="flex items-center gap-3 bg-surface-container-low rounded-full px-4 py-2 w-96">
           <span className="material-symbols-outlined text-slate-400 text-[20px]">search</span>
@@ -77,8 +84,11 @@ export default function Dashboard() {
             className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400 outline-none" />
         </div>
         <div className="flex items-center gap-2">
-          <button className="hover:bg-surface-container rounded-full p-2 text-slate-500 transition-colors">
+          <button className={`relative hover:bg-surface-container rounded-full p-2 transition-colors ${hasAlert ? 'text-error' : 'text-slate-500'}`}>
             <span className="material-symbols-outlined text-[22px]">notifications</span>
+            {hasAlert && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-error rounded-full border-2 border-background" />
+            )}
           </button>
           <button className="hover:bg-surface-container rounded-full p-2 text-slate-500 transition-colors">
             <span className="material-symbols-outlined text-[22px]">history_edu</span>
@@ -87,20 +97,36 @@ export default function Dashboard() {
       </header>
 
       <div className="px-10 py-8 pb-16 max-w-7xl mx-auto">
-
-        {/* Page heading */}
         <div className="mb-8">
           <p className="text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Overview</p>
           <h1 className="text-3xl font-manrope font-extrabold text-on-surface tracking-tight">Dashboard</h1>
         </div>
 
+        {/* Budget alerts */}
+        {budgetAlerts.map((alert) => (
+          <div key={alert.category}
+            className={`mb-4 px-5 py-3 rounded-xl text-sm font-inter flex items-center gap-2 ${
+              alert.status === 'exceeded'
+                ? 'bg-error text-on-error-container'
+                : 'bg-warning-container text-on-warning-container'
+            }`}>
+            <span className="material-symbols-outlined text-[18px]">
+              {alert.status === 'exceeded' ? 'warning' : 'info'}
+            </span>
+            <strong>{alert.category}:</strong>
+            {alert.status === 'exceeded' ? 'Budget exceeded!' : `You've used ${alert.percent}% of your ${alert.category} budget.`}
+          </div>
+        ))}
+
         {/* Hero grid */}
         <div className="grid grid-cols-12 gap-6 mb-10">
           <div className="col-span-12 lg:col-span-7">
             <BalanceCard
-              balance={stats ? fmtTotal(stats.total) : '$0.00'}
-              changePercent={change}
+              balance={stats ? fmtTotal(stats.netBalance) : '$0.00'}
+              totalIncome={stats ? stats.totalIncome : 0}
+              totalExpense={stats ? stats.totalExpense : 0}
               byMonth={stats?.byMonth ?? {}}
+              changePercent={change}
               isLoading={fetching}
             />
           </div>
@@ -109,7 +135,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Error banner */}
+        {/* Budget progress bars */}
+        {budgetProgress && budgetProgress.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-manrope font-extrabold text-on-surface mb-4">Budget Progress — This Month</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {budgetProgress.map((b) => (
+                <div key={b.category} className="bg-surface-container-low rounded-2xl p-5">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-inter font-bold text-sm text-on-surface">{b.category}</span>
+                    <span className={`font-manrope font-bold text-sm ${b.percent >= 100 ? 'text-error' : 'text-slate-600'}`}>
+                      ${b.spent.toFixed(2)} / ${b.limit.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        b.percent >= 100 ? 'bg-error' : b.percent >= 80 ? 'bg-warning' : 'bg-primary'
+                      }`}
+                      style={{ width: `${Math.min(b.percent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-inter uppercase tracking-widest">
+                    {b.percent}% used
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-6 px-5 py-3 bg-error-container text-on-error-container rounded-xl text-sm font-inter flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px]">error</span>
@@ -127,14 +182,12 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-
           <div className="bg-surface-container-lowest rounded-4xl p-8 shadow-card-sm overflow-x-auto">
             <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="text-left border-b border-surface-container">
                   {['Date','Description','Category','Amount'].map((col) => (
-                    <th key={col}
-                      className={`pb-5 text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 px-4 ${col === 'Amount' ? 'text-right' : ''}`}>
+                    <th key={col} className={`pb-5 text-[10px] font-inter font-bold uppercase tracking-[0.2em] text-slate-400 px-4 ${col === 'Amount' ? 'text-right' : ''}`}>
                       {col}
                     </th>
                   ))}
@@ -142,7 +195,7 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-surface-container/40">
                 {fetching ? (
-                  <tr><td colSpan="4" className="py-10 text-center text-slate-400 italic">Loading financial records…</td></tr>
+                  <tr><td colSpan="4" className="py-10 text-center text-slate-400 italic">Loading…</td></tr>
                 ) : transactions.length === 0 ? (
                   <tr><td colSpan="4" className="py-10 text-center text-slate-400 italic">No transactions yet. Add your first one!</td></tr>
                 ) : recent.map((tx, i) => <TransactionRow key={tx.id || i} {...tx} />)}
@@ -151,7 +204,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Bottom info cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
           <div className="bg-surface-container-low rounded-3xl p-6">
             <span className="text-[10px] font-inter font-bold uppercase tracking-widest text-slate-400">Upcoming Bills</span>
@@ -163,7 +215,6 @@ export default function Dashboard() {
               <p className="font-manrope font-bold text-on-surface">$52.99</p>
             </div>
           </div>
-
           <div className="bg-surface-container-low rounded-3xl p-6">
             <span className="text-[10px] font-inter font-bold uppercase tracking-widest text-slate-400">Savings Goal</span>
             <div className="mt-4">
@@ -176,7 +227,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
           <div className="bg-surface-container-low rounded-3xl p-6 flex items-center justify-center border-2 border-dashed border-outline-variant/40">
             <div className="text-center">
               <span className="material-symbols-outlined text-slate-400 text-3xl">add_circle</span>

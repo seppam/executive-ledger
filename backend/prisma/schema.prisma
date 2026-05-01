@@ -1,6 +1,4 @@
 // This is your Prisma schema file — Prisma 7 format.
-// Connection URL is managed in prisma.config.ts, not here.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,14 +8,92 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ── Expenses table (matches PRD schema) ────────────────────────────────────────
+// ── Auth ────────────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  role      String   @default("editor")  // "owner" | "editor" | "viewer"
+  createdAt DateTime @default(now())
+
+  // Own data
+  expenses           Expense[]
+  budgets            Budget[]
+  recurringRules     RecurringRule[]
+  invitationsSent   Invitation[]   @relation("InvitationSender")
+  invitationsReceived Invitation[] @relation("InvitationRecipient")
+}
+
+model Invitation {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  email      String
+  role       String   // "editor" | "viewer"
+  invitedById String
+  accepted   Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  invitedBy  User   @relation("InvitationSender",   fields: [invitedById], references: [id])
+  invitee   User?  @relation("InvitationRecipient", fields: [inviteeId], references: [id])
+  inviteeId String?
+
+  @@map("invitations")
+}
+
+// ── Transactions ────────────────────────────────────────────────────────────────
 model Expense {
-  id          String   @id @default(uuid())
-  amount      Float
-  category    String
-  description String
-  date        String   // ISO date string: "YYYY-MM-DD"
-  created_at  DateTime @default(now())
+  id           String   @id @default(uuid())
+  amount       Float
+  type         String   @default("expense")  // "income" | "expense"
+  category     String
+  description  String
+  date         String   // "YYYY-MM-DD"
+  isRecurring  Boolean  @default(false)     // was this auto-created?
+  recurringRuleId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  recurringRule RecurringRule? @relation(fields: [recurringRuleId], references: [id])
 
   @@map("expenses")
+}
+
+// ── Budgets ────────────────────────────────────────────────────────────────────
+model Budget {
+  id        String   @id @default(uuid())
+  category  String
+  limit     Float
+  month     Int      // 1–12
+  year      Int
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, category, month, year])
+  @@map("budgets")
+}
+
+// ── Recurring Transactions ──────────────────────────────────────────────────────
+model RecurringRule {
+  id           String   @id @default(uuid())
+  amount       Float
+  type         String   // "income" | "expense"
+  category     String
+  description  String
+  frequency    String   // "daily" | "weekly" | "monthly"
+  startDate    String   // "YYYY-MM-DD"
+  lastLoggedAt String?  // "YYYY-MM-DD" — last time we auto-created an expense
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  expenses    Expense[]
+
+  @@map("recurring_rules")
 }
