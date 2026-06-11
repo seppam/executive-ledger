@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { apiFetch, apiPost, apiDel } from '../services/apiClient';
+import { getExpenses, deleteExpense } from '../services/expenseService';
 
 const CATEGORIES_EXPENSE = ['Food & Dining','Transport','Rent & Utilities','Entertainment','Software/SaaS','Travel','Health','Others'];
 const CATEGORIES_INCOME  = ['Salary','Freelance','Investment','Gift','Refund','Others'];
-const ALL_CATEGORIES = [...new Set([...CATEGORIES_EXPENSE, ...CATEGORIES_INCOME])];
 
 const categoryColors = {
   'Food & Dining':    'text-amber-700 bg-amber-50',
@@ -13,34 +12,32 @@ const categoryColors = {
   'Rent & Utilities': 'text-purple-700 bg-purple-50',
   'Entertainment':    'text-pink-700 bg-pink-50',
   'Software/SaaS':    'text-indigo-700 bg-indigo-50',
-  'Travel':           'text-teal-700 bg-teal-50',
-  'Investments':      'text-tertiary bg-tertiary-container/20',
-  'Health':           'text-green-700 bg-green-50',
-  'Others':           'text-slate-600 bg-surface-container',
-  'Salary':           'text-green-700 bg-green-50',
-  'Freelance':        'text-blue-700 bg-blue-50',
-  'Gift':             'text-pink-700 bg-pink-50',
-  'Refund':           'text-teal-700 bg-teal-50',
+  'Travel':          'text-teal-700 bg-teal-50',
+  'Investments':     'text-tertiary bg-tertiary-container/20',
+  'Health':          'text-green-700 bg-green-50',
+  'Others':          'text-slate-600 bg-surface-container',
+  'Salary':          'text-green-700 bg-green-50',
+  'Freelance':       'text-blue-700 bg-blue-50',
+  'Gift':            'text-pink-700 bg-pink-50',
+  'Refund':          'text-teal-700 bg-teal-50',
 };
 
 export default function Expenses() {
   const { openModal, openEditModal, triggerRefresh, refreshSeed } = useOutletContext();
-  const { getHeaders } = useAuth();
 
   const [expenses, setExpenses]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'income' | 'expense'
+  const [loading, setLoading]       = useState(true);
+  const [typeFilter, setTypeFilter] = useState('all');
   const [catFilter, setCatFilter]   = useState('');
   const [deletingId, setDeletingId] = useState(null);
 
   async function load() {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (typeFilter !== 'all') params.set('type', typeFilter);
-      if (catFilter) params.set('category', catFilter);
-      const qs = params.toString();
-      const data = await apiFetch(`/api/expenses${qs ? '?' + qs : ''}`, getHeaders);
+      const params = {};
+      if (typeFilter !== 'all') params.type = typeFilter;
+      if (catFilter) params.category = catFilter;
+      const data = await getExpenses(params);
       setExpenses(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -55,7 +52,7 @@ export default function Expenses() {
     if (!confirm('Delete this transaction?')) return;
     setDeletingId(id);
     try {
-      await apiDel(`/api/expenses/${id}`);
+      await deleteExpense(id);
       setExpenses((p) => p.filter((e) => e.id !== id));
     } catch (err) { alert(`Delete failed: ${err.message}`); }
     finally { setDeletingId(null); }
@@ -65,9 +62,10 @@ export default function Expenses() {
 
   const totalIncome  = filtered.filter((e) => e.type === 'income').reduce((s, e) => s + Number(e.amount), 0);
   const totalExpense = filtered.filter((e) => e.type === 'expense').reduce((s, e) => s + Number(e.amount), 0);
-  const net         = totalIncome - totalExpense;
-  const fmtAmt      = (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(a));
-  const usedCats    = [...new Set(expenses.map((e) => e.category))];
+  const net          = totalIncome - totalExpense;
+
+  const fmtAmt = (a) => `Rp ${Math.abs(Number(a) || 0).toLocaleString('id-ID')}`;
+  const usedCats = [...new Set(expenses.map((e) => e.category))];
 
   return (
     <div className="px-10 py-8 pb-16 max-w-7xl mx-auto">

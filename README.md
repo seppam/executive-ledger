@@ -34,6 +34,44 @@ A personal expense tracker with multi-user collaboration, AI spending insights, 
 
 ---
 
+## 🌐 Live Demo (No Server Needed!)
+
+**👉 Open the demo directly in your browser:**
+Just open `frontend/dist/index.html` as a file, or serve the `frontend/dist/` folder with any static server.
+
+> **No MongoDB, no JWT, no SMTP, no backend server required.**
+> Everything runs in the browser using localStorage.
+
+### What's Included in the Demo
+
+| Feature | Status |
+|---------|--------|
+| Add / Edit / Delete transactions | ✅ Works locally |
+| Income + Expense tracking | ✅ Full support |
+| Category filters & type filters | ✅ Full support |
+| Dashboard with charts | ✅ Works locally |
+| Budget limits & alerts | ✅ Works locally |
+| AI spending insights | ✅ Demo responses (or real with your API key) |
+| AI chat | ✅ Demo responses (or real with your API key) |
+| Receipt scanning | ✅ Mock scanner (shows realistic Indonesian data) |
+| CSV export | ✅ Client-side download |
+| PDF export | ✅ Client-side via jsPDF |
+| Gemini API key (optional) | ✅ Optional — enter in Settings |
+
+### Deploying to GitHub Pages
+
+```bash
+cd frontend
+npm install
+npm run build
+# Push the dist/ folder to a gh-pages branch
+# or use GitHub Actions to automate deployment
+```
+
+Then visit: `https://seppam.github.io/executive-ledger/`
+
+---
+
 ## 🛠 Tech Stack
 
 | Layer | Technology |
