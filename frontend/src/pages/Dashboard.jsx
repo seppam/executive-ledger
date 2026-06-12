@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import BalanceCard from '../components/BalanceCard';
 import AIInsightCard from '../components/AIInsightCard';
+import ErrorBoundary from '../components/ErrorBoundary';
 import TransactionRow from '../components/TransactionRow';
 import { getSpendingInsights } from '../services/geminiService';
 import {
@@ -127,13 +128,16 @@ export default function Dashboard() {
         {/* Hero grid */}
         <div className="grid grid-cols-12 gap-6 mb-10">
           <div className="col-span-12 lg:col-span-7">
-            <BalanceCard
+            <ErrorBoundary>
+              <BalanceCard
               balance={stats ? fmtNet(stats.netBalance) : 'Rp 0'}
               totalIncome={stats ? stats.totalIncome : 0}
               totalExpense={stats ? stats.totalExpense : 0}
               byMonth={stats?.byMonth ?? {}}
               changePercent={change}
               isLoading={fetching}
+              />
+            </ErrorBoundary>
             />
           </div>
           <div className="col-span-12 lg:col-span-5">
