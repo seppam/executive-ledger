@@ -39,3 +39,5 @@ backend/prisma/migrations/*.sql
 *.db-journal
 *.db-shm
 *.db-wal
+node_modules/
+dist/
