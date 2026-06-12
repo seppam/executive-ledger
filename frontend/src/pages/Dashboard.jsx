@@ -138,7 +138,6 @@ export default function Dashboard() {
               isLoading={fetching}
               />
             </ErrorBoundary>
-            />
           </div>
           <div className="col-span-12 lg:col-span-5">
             <AIInsightCard insight={insight} loading={loading} onGenerateClick={handleGenerateInsight} />
